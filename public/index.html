@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>La Salle - Sistema de Consulta de Alumnos</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1e3a8a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="La Salle Alumnos">
+    <link rel="apple-touch-icon" href="icon-192.png">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo-container">
+                    <img src="logo_lasalle.png" alt="La Salle" class="logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    <div class="logo-text" style="display: none;">La Salle</div>
+                </div>
+                <div class="header-title">
+                    <h1>Consulta de Alumnos</h1>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Search Card -->
+            <div class="card search-card">                
+                <div class="card-body">
+                    <!-- Filter Toggle Button -->
+                    <div class="filter-toggle-section">
+                        <button id="filterToggle" class="filter-toggle-btn">
+                            <svg class="filter-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="22,3 2,3 10,12.46 10,19 14,21 14,12.46"></polygon>
+                            </svg>
+                            <span id="filterLabel">Solo Activos</span>
+                            <svg class="chevron-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6,9 12,15 18,9"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Estado Filter (Colapsible) -->
+                    <div class="filter-section" id="filterSection" style="display: none;">
+                        <div class="radio-group">
+                            <label class="radio-item">
+                                <input type="radio" name="estado" value="activos" checked>
+                                <span class="radio-custom"></span>
+                                Solo Activos
+                            </label>
+                            <label class="radio-item">
+                                <input type="radio" name="estado" value="egresados">
+                                <span class="radio-custom"></span>
+                                Solo Egresados
+                            </label>
+                            <label class="radio-item">
+                                <input type="radio" name="estado" value="todos">
+                                <span class="radio-custom"></span>
+                                Todos
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Search Input -->
+                    <div class="search-section">
+                        <label for="searchInput" class="search-label">Ingrese nombre o apellido:</label>
+                        <div class="search-input-container">
+                            <input type="text" id="searchInput" class="search-input" placeholder="Escriba para buscar...">
+                            <button id="clearButton" class="clear-button" title="Limpiar">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="search-status" id="searchStatus">Escriba para buscar en tiempo real...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Card -->
+            <div class="card results-card">
+                <div class="card-header">
+                    <h2>Resultados</h2>
+                    <div class="results-count" id="resultsCount"></div>
+                </div>
+                
+                <div class="card-body">
+                    <!-- Loading -->
+                    <div class="loading" id="loading" style="display: none;">
+                        <div class="loading-spinner"></div>
+                        <span>Buscando...</span>
+                    </div>
+                    
+                    <!-- Results Table -->
+                    <div class="results-container" id="resultsContainer">
+                        <div class="table-header">
+                            <div class="table-col-alumno" data-sort="alumno">
+                                <span>Alumno</span>
+                                <svg class="sort-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6,9 12,15 18,9"></polyline>
+                                </svg>
+                            </div>
+                            <div class="table-col-curso" data-sort="curso">
+                                <span>Curso</span>
+                                <svg class="sort-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6,9 12,15 18,9"></polyline>
+                                </svg>
+                            </div>
+                        </div>
+                        
+                        <div class="table-body" id="tableBody">
+                            <!-- Resultados se insertan aqui -->
+                        </div>
+                    </div>
+                    
+                    <!-- Empty State -->
+                    <div class="empty-state" id="emptyState" style="display: none;">
+                        <div class="empty-icon">
+                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="m21 21-4.35-4.35"></path>
+                            </svg>
+                        </div>
+                        <p>No se encontraron coincidencias</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>&copy; 2024 La Salle Florida. Todos los derechos reservados.</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+    <!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>La Salle - Sistema de Consulta de Alumnos</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1e3a8a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="La Salle Alumnos">
+    <link rel="apple-touch-icon" href="icon-192.png">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo-container">
+                    <img src="logo_lasalle.png" alt="La Salle" class="logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    <div class="logo-text" style="display: none;">La Salle</div>
+                </div>
+                <div class="header-title">
+                    <h1>Consulta de Alumnos</h1>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Search Card -->
+            <div class="card search-card">                
+                <div class="card-body">
+                    <!-- Filter Toggle Button -->
+                    <div class="filter-toggle-section">
+                        <button id="filterToggle" class="filter-toggle-btn">
+                            <svg class="filter-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="22,3 2,3 10,12.46 10,19 14,21 14,12.46"></polygon>
+                            </svg>
+                            <span id="filterLabel">Solo Activos</span>
+                            <svg class="chevron-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6,9 12,15 18,9"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Estado Filter (Colapsible) -->
+                    <div class="filter-section" id="filterSection" style="display: none;">
+                        <div class="radio-group">
+                            <label class="radio-item">
+                                <input type="radio" name="estado" value="activos" checked>
+                                <span class="radio-custom"></span>
+                                Solo Activos
+                            </label>
+                            <label class="radio-item">
+                                <input type="radio" name="estado" value="egresados">
+                                <span class="radio-custom"></span>
+                                Solo Egresados
+                            </label>
+                            <label class="radio-item">
+                                <input type="radio" name="estado" value="todos">
+                                <span class="radio-custom"></span>
+                                Todos
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Search Input -->
+                    <div class="search-section">
+                        <label for="searchInput" class="search-label">Ingrese nombre o apellido:</label>
+                        <div class="search-input-container">
+                            <input type="text" id="searchInput" class="search-input" placeholder="Escriba para buscar...">
+                            <button id="clearButton" class="clear-button" title="Limpiar">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="search-status" id="searchStatus">Escriba para buscar en tiempo real...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Card -->
+            <div class="card results-card">
+                <div class="card-header">
+                    <h2>Resultados</h2>
+                    <div class="results-count" id="resultsCount"></div>
+                </div>
+                
+                <div class="card-body">
+                    <!-- Loading -->
+                    <div class="loading" id="loading" style="display: none;">
+                        <div class="loading-spinner"></div>
+                        <span>Buscando...</span>
+                    </div>
+                    
+                    <!-- Results Table -->
+                    <div class="results-container" id="resultsContainer">
+                        <div class="table-header">
+                            <div class="table-col-alumno" data-sort="alumno">
+                                <span>Alumno</span>
+                                <svg class="sort-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6,9 12,15 18,9"></polyline>
+                                </svg>
+                            </div>
+                            <div class="table-col-curso" data-sort="curso">
+                                <span>Curso</span>
+                                <svg class="sort-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6,9 12,15 18,9"></polyline>
+                                </svg>
+                            </div>
+                        </div>
+                        
+                        <div class="table-body" id="tableBody">
+                            <!-- Resultados se insertan aqui -->
+                        </div>
+                    </div>
+                    
+                    <!-- Empty State -->
+                    <div class="empty-state" id="emptyState" style="display: none;">
+                        <div class="empty-icon">
+                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="m21 21-4.35-4.35"></path>
+                            </svg>
+                        </div>
+                        <p>No se encontraron coincidencias</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>&copy; 2024 La Salle Florida. Todos los derechos reservados.</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+
+        <!-- ✅ Registro del Service Worker -->
+    <script>
+        if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('✅ Service Worker registrado:', reg.scope))
+            .catch(err => console.error('❌ Error al registrar Service Worker:', err));
+        });
+        }
+    </script>
+</body>
+</html>
