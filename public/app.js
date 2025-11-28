@@ -4,15 +4,45 @@ class AlumnosApp {
         this.resultadosActuales = [];
         this.ordenActual = { columna: null, ascendente: true };
         this.searchTimer = null;
-        this.hasUserInteracted = false; // Seguimiento de interaccion del usuario
+        this.hasUserInteracted = false;
+        this.currentUser = null;
+        this.isInitialized = false;
         
-        this.initializeElements();
-        this.setupEventListeners();
-        this.initializeApp();
+        console.log('Inicializando AlumnosApp...');
+        this.init();
     }
     
-    initializeElements() {
-        // Elementos del DOM
+    async init() {
+        // SOLO verificar auth UNA vez al inicio
+        try {
+            console.log('Verificando autenticacion...');
+            const response = await fetch('/auth/status');
+            const data = await response.json();
+            
+            if (data.authenticated && data.user) {
+                console.log('Usuario autenticado:', data.user.email);
+                this.currentUser = data.user;
+                this.setupApp();
+            } else {
+                console.log('No autenticado, redirigiendo...');
+                window.location.href = '/login';
+            }
+        } catch (error) {
+            console.error('Error de autenticacion:', error);
+            window.location.href = '/login';
+        }
+    }
+    
+    setupApp() {
+        if (this.isInitialized) {
+            console.log('App ya inicializada');
+            return;
+        }
+        
+        console.log('Configurando aplicacion...');
+        this.isInitialized = true;
+        
+        // Obtener elementos del DOM
         this.searchInput = document.getElementById('searchInput');
         this.clearButton = document.getElementById('clearButton');
         this.searchStatus = document.getElementById('searchStatus');
@@ -21,169 +51,153 @@ class AlumnosApp {
         this.resultsContainer = document.getElementById('resultsContainer');
         this.tableBody = document.getElementById('tableBody');
         this.emptyState = document.getElementById('emptyState');
-        
-        // Filter toggle elements
         this.filterToggle = document.getElementById('filterToggle');
         this.filterSection = document.getElementById('filterSection');
         this.filterLabel = document.getElementById('filterLabel');
-        this.chevronIcon = this.filterToggle.querySelector('.chevron-icon');
-        
-        // Radio buttons de estado
         this.estadoRadios = document.querySelectorAll('input[name="estado"]');
-        
-        // Headers de tabla para ordenamiento
         this.tableHeaders = document.querySelectorAll('[data-sort]');
         
-        // Estado del filtro
-        this.filterOpen = false;
+        // Configurar eventos
+        this.setupEvents();
+        this.createUserMenu();
+        this.updateFilterLabel();
+        
+        if (this.searchInput) {
+            this.searchInput.focus();
+        }
+        
+        console.log('App configurada exitosamente');
     }
     
-    setupEventListeners() {
-        // Busqueda en tiempo real
-        this.searchInput.addEventListener('input', () => this.onSearchChange());
+    setupEvents() {
+        if (this.searchInput) {
+            this.searchInput.addEventListener('input', () => this.onSearchChange());
+            this.searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') this.limpiarBusqueda();
+            });
+        }
         
-        // Filter toggle
-        this.filterToggle.addEventListener('click', () => this.toggleFilter());
+        if (this.clearButton) {
+            this.clearButton.addEventListener('click', () => this.limpiarBusqueda());
+        }
         
-        // Cambio de filtro de estado
+        if (this.filterToggle) {
+            this.filterToggle.addEventListener('click', () => this.toggleFilter());
+        }
+        
         this.estadoRadios.forEach(radio => {
             radio.addEventListener('change', () => this.onFilterChange());
         });
         
-        // Boton limpiar
-        this.clearButton.addEventListener('click', () => this.limpiarBusqueda());
-        
-        // Headers para ordenamiento
         this.tableHeaders.forEach(header => {
             header.addEventListener('click', () => {
                 const columna = header.dataset.sort;
                 this.ordenarPorColumna(columna);
             });
         });
-        
-        // Eventos de teclado
-        this.searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                this.limpiarBusqueda();
-            }
-        });
-        
-        // Prevenir zoom en iOS al hacer focus
-        this.searchInput.addEventListener('touchstart', (e) => {
-            this.searchInput.style.fontSize = '16px';
-        });
-        
-        // Cerrar filtro al hacer click fuera (en TODAS las pantallas)
-        document.addEventListener('click', (e) => {
-            if (!this.filterToggle.contains(e.target) && 
-                !this.filterSection.contains(e.target) && 
-                this.filterOpen) {
-                this.closeFilter();
-            }
-        });
     }
     
-    initializeApp() {
-        // Focus inicial en el campo de busqueda
-        this.searchInput.focus();
+    createUserMenu() {
+        const header = document.querySelector('.header-content');
+        if (!header || !this.currentUser) return;
         
-        // Inicializar label del filtro
-        this.updateFilterLabel();
+        const existingTitle = header.querySelector('.header-title');
+        if (existingTitle) existingTitle.remove();
         
-        // Registrar service worker si esta disponible
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js').catch(console.error);
-        }
+        const userMenu = document.createElement('div');
+        userMenu.className = 'user-menu-container';
+        userMenu.innerHTML = `
+            <div class="user-info">
+                <img src="${this.currentUser.photo}" alt="${this.currentUser.name}" class="user-avatar">
+                <div class="user-details">
+                    <span class="user-name">${this.currentUser.name}</span>
+                    <span class="user-email">${this.currentUser.email}</span>
+                </div>
+                <button class="logout-btn" onclick="alumnosApp.logout()">Cerrar Sesion</button>
+            </div>
+        `;
         
-        // Ajustar interfaz segun tamaño de pantalla
-        this.adjustForScreenSize();
-        
-        // Escuchar cambios de orientacion/tamaño
-        window.addEventListener('resize', () => this.adjustForScreenSize());
+        header.appendChild(userMenu);
+        this.addUserMenuStyles();
     }
     
-    adjustForScreenSize() {
-        // En TODAS las pantallas, filtros cerrados por defecto
-        if (this.filterOpen && !this.hasUserInteracted) {
-            this.closeFilter();
+    addUserMenuStyles() {
+        if (document.getElementById('user-menu-styles')) return;
+        
+        const style = document.createElement('style');
+        style.id = 'user-menu-styles';
+        style.textContent = `
+            .user-menu-container {
+                margin-left: auto;
+            }
+            .user-info {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                padding: 0.5rem;
+            }
+            .user-avatar {
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                border: 2px solid rgba(255, 255, 255, 0.3);
+            }
+            .user-details {
+                display: flex;
+                flex-direction: column;
+                color: white;
+                text-align: right;
+            }
+            .user-name {
+                font-weight: 600;
+                font-size: 0.9rem;
+            }
+            .user-email {
+                font-size: 0.75rem;
+                opacity: 0.8;
+            }
+            .logout-btn {
+                background: rgba(255, 255, 255, 0.2);
+                color: white;
+                border: none;
+                padding: 0.5rem 1rem;
+                border-radius: 0.5rem;
+                cursor: pointer;
+                font-size: 0.85rem;
+            }
+            .logout-btn:hover {
+                background: rgba(255, 255, 255, 0.3);
+            }
+            @media (max-width: 768px) {
+                .user-details { display: none; }
+                .user-avatar { width: 32px; height: 32px; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    async logout() {
+        try {
+            await fetch('/auth/logout', { method: 'POST' });
+            window.location.href = '/login';
+        } catch (error) {
+            window.location.href = '/login';
         }
     }
     
     onSearchChange() {
-        const texto = this.searchInput.value.trim();
+        const texto = this.searchInput?.value?.trim() || '';
         
-        // Cancelar timer anterior
         if (this.searchTimer) {
             clearTimeout(this.searchTimer);
         }
         
         if (texto) {
             this.updateSearchStatus('Buscando...', 'searching');
-            // Delay de 300ms para evitar demasiadas consultas
             this.searchTimer = setTimeout(() => this.realizarBusqueda(texto), 300);
         } else {
             this.limpiarResultados();
             this.updateSearchStatus('Escriba para buscar en tiempo real...', 'idle');
-        }
-    }
-    
-    onFilterChange() {
-        // Actualizar label del filtro
-        this.updateFilterLabel();
-        
-        // Realizar busqueda si hay texto
-        const texto = this.searchInput.value.trim();
-        if (texto) {
-            this.onSearchChange();
-        }
-        
-        // Cerrar filtro automaticamente en TODAS las pantallas
-        setTimeout(() => this.closeFilter(), 300);
-    }
-    
-    toggleFilter() {
-        this.hasUserInteracted = true; // Usuario interactúo manualmente
-        
-        if (this.filterOpen) {
-            this.closeFilter();
-        } else {
-            this.openFilter();
-        }
-    }
-    
-    openFilter() {
-        this.filterOpen = true;
-        this.filterSection.style.display = 'block';
-        this.filterToggle.classList.add('active');
-        
-        // Enfocar en el primer radio button
-        const firstRadio = this.filterSection.querySelector('input[type="radio"]');
-        if (firstRadio) {
-            setTimeout(() => firstRadio.focus(), 100);
-        }
-    }
-    
-    closeFilter() {
-        this.filterOpen = false;
-        this.filterSection.classList.add('hiding');
-        this.filterToggle.classList.remove('active');
-        
-        // Ocultar despues de la animacion
-        setTimeout(() => {
-            this.filterSection.style.display = 'none';
-            this.filterSection.classList.remove('hiding');
-        }, 300);
-    }
-    
-    updateFilterLabel() {
-        const selectedRadio = document.querySelector('input[name="estado"]:checked');
-        if (selectedRadio) {
-            const labels = {
-                'activos': 'Solo Activos',
-                'egresados': 'Solo Egresados',
-                'todos': 'Todos'
-            };
-            this.filterLabel.textContent = labels[selectedRadio.value] || 'Solo Activos';
         }
     }
     
@@ -197,8 +211,9 @@ class AlumnosApp {
             const estado = this.getSelectedEstado();
             const response = await fetch(`/api/alumnos/buscar?texto=${encodeURIComponent(texto)}&estado=${estado}`);
             
-            if (!response.ok) {
-                throw new Error(`Error ${response.status}: ${response.statusText}`);
+            if (response.status === 401) {
+                window.location.href = '/login';
+                return;
             }
             
             const data = await response.json();
@@ -210,8 +225,7 @@ class AlumnosApp {
             }
             
         } catch (error) {
-            console.error('Error en busqueda:', error);
-            this.mostrarError('Error de conexion. Verifique su red.');
+            this.mostrarError('Error de conexion');
         } finally {
             this.showLoading(false);
             this.busquedaActiva = false;
@@ -219,8 +233,8 @@ class AlumnosApp {
     }
     
     getSelectedEstado() {
-        const selectedRadio = document.querySelector('input[name="estado"]:checked');
-        return selectedRadio ? selectedRadio.value : 'activos';
+        const selected = document.querySelector('input[name="estado"]:checked');
+        return selected ? selected.value : 'activos';
     }
     
     mostrarResultados(resultados) {
@@ -228,45 +242,35 @@ class AlumnosApp {
         this.actualizarTabla();
         this.actualizarContador(resultados.length);
         
-        // Mostrar/ocultar elementos segun resultados
         if (resultados.length === 0) {
-            this.resultsContainer.style.display = 'none';
-            this.emptyState.style.display = 'block';
+            if (this.resultsContainer) this.resultsContainer.style.display = 'none';
+            if (this.emptyState) this.emptyState.style.display = 'block';
             this.updateSearchStatus('No se encontraron coincidencias', 'empty');
         } else {
-            this.resultsContainer.style.display = 'block';
-            this.emptyState.style.display = 'none';
+            if (this.resultsContainer) this.resultsContainer.style.display = 'block';
+            if (this.emptyState) this.emptyState.style.display = 'none';
             this.updateSearchStatus('Busqueda completada', 'success');
         }
     }
     
     actualizarTabla() {
-        // Limpiar tabla
-        this.tableBody.innerHTML = '';
+        if (!this.tableBody) return;
         
-        // Agregar filas
+        this.tableBody.innerHTML = '';
         this.resultadosActuales.forEach((alumno, index) => {
-            const row = this.createTableRow(alumno, index);
+            const row = document.createElement('div');
+            row.className = `table-row ${index % 2 === 0 ? 'even' : 'odd'}`;
+            row.innerHTML = `
+                <div class="table-cell table-cell-alumno">${this.escapeHtml(alumno.ApNom)}</div>
+                <div class="table-cell table-cell-curso">${this.escapeHtml(alumno.denominacion)}</div>
+            `;
             this.tableBody.appendChild(row);
         });
-    }
-    
-    createTableRow(alumno, index) {
-        const row = document.createElement('div');
-        row.className = `table-row ${index % 2 === 0 ? 'even' : 'odd'}`;
-        
-        row.innerHTML = `
-            <div class="table-cell table-cell-alumno">${this.escapeHtml(alumno.ApNom)}</div>
-            <div class="table-cell table-cell-curso">${this.escapeHtml(alumno.denominacion)}</div>
-        `;
-        
-        return row;
     }
     
     ordenarPorColumna(columna) {
         if (!this.resultadosActuales.length) return;
         
-        // Determinar direccion de orden
         if (this.ordenActual.columna === columna) {
             this.ordenActual.ascendente = !this.ordenActual.ascendente;
         } else {
@@ -274,7 +278,6 @@ class AlumnosApp {
             this.ordenActual.ascendente = true;
         }
         
-        // Ordenar resultados
         const campo = columna === 'alumno' ? 'ApNom' : 'denominacion';
         this.resultadosActuales.sort((a, b) => {
             const valueA = a[campo].toUpperCase();
@@ -287,29 +290,44 @@ class AlumnosApp {
             }
         });
         
-        // Actualizar iconos de ordenamiento
-        this.actualizarIconosOrden(columna);
-        
-        // Actualizar tabla
         this.actualizarTabla();
     }
     
-    actualizarIconosOrden(columnaActiva) {
-        this.tableHeaders.forEach(header => {
-            const icon = header.querySelector('.sort-icon');
-            const columna = header.dataset.sort;
-            
-            if (columna === columnaActiva) {
-                icon.classList.toggle('asc', this.ordenActual.ascendente);
-                header.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-            } else {
-                icon.classList.remove('asc');
-                header.style.backgroundColor = '';
-            }
-        });
+    toggleFilter() {
+        if (!this.filterSection) return;
+        
+        const isVisible = this.filterSection.style.display !== 'none';
+        this.filterSection.style.display = isVisible ? 'none' : 'block';
+    }
+    
+    onFilterChange() {
+        this.updateFilterLabel();
+        
+        const texto = this.searchInput?.value?.trim() || '';
+        if (texto) {
+            this.onSearchChange();
+        }
+        
+        setTimeout(() => {
+            if (this.filterSection) this.filterSection.style.display = 'none';
+        }, 300);
+    }
+    
+    updateFilterLabel() {
+        const selected = document.querySelector('input[name="estado"]:checked');
+        if (selected && this.filterLabel) {
+            const labels = {
+                'activos': 'Solo Activos',
+                'egresados': 'Solo Egresados',
+                'todos': 'Todos'
+            };
+            this.filterLabel.textContent = labels[selected.value] || 'Solo Activos';
+        }
     }
     
     actualizarContador(cantidad) {
+        if (!this.resultsCount) return;
+        
         let texto = '';
         if (cantidad === 0) {
             texto = 'Sin resultados';
@@ -322,55 +340,50 @@ class AlumnosApp {
     }
     
     updateSearchStatus(mensaje, tipo) {
-        this.searchStatus.textContent = mensaje;
+        if (!this.searchStatus) return;
         
-        // Remover clases anteriores
+        this.searchStatus.textContent = mensaje;
         this.searchStatus.classList.remove('searching', 'success', 'error', 'empty');
         
-        // Agregar clase segun tipo
         if (tipo !== 'idle') {
             this.searchStatus.classList.add(tipo);
         }
     }
     
     showLoading(show) {
-        this.loading.style.display = show ? 'flex' : 'none';
+        if (this.loading) {
+            this.loading.style.display = show ? 'flex' : 'none';
+        }
         
         if (show) {
-            this.resultsContainer.style.display = 'none';
-            this.emptyState.style.display = 'none';
+            if (this.resultsContainer) this.resultsContainer.style.display = 'none';
+            if (this.emptyState) this.emptyState.style.display = 'none';
         }
     }
     
     mostrarError(mensaje) {
         this.updateSearchStatus(`Error: ${mensaje}`, 'error');
-        this.resultsCount.textContent = 'Error';
-        this.resultsContainer.style.display = 'none';
-        this.emptyState.style.display = 'none';
+        if (this.resultsCount) this.resultsCount.textContent = 'Error';
+        if (this.resultsContainer) this.resultsContainer.style.display = 'none';
+        if (this.emptyState) this.emptyState.style.display = 'none';
     }
     
     limpiarBusqueda() {
-        this.searchInput.value = '';
+        if (this.searchInput) {
+            this.searchInput.value = '';
+            this.searchInput.focus();
+        }
         this.limpiarResultados();
-        this.searchInput.focus();
     }
     
     limpiarResultados() {
-        this.tableBody.innerHTML = '';
-        this.resultsCount.textContent = '';
+        if (this.tableBody) this.tableBody.innerHTML = '';
+        if (this.resultsCount) this.resultsCount.textContent = '';
         this.resultadosActuales = [];
         this.ordenActual = { columna: null, ascendente: true };
         
-        // Resetear iconos de ordenamiento
-        this.tableHeaders.forEach(header => {
-            const icon = header.querySelector('.sort-icon');
-            icon.classList.remove('asc');
-            header.style.backgroundColor = '';
-        });
-        
-        // Ocultar elementos
-        this.resultsContainer.style.display = 'none';
-        this.emptyState.style.display = 'none';
+        if (this.resultsContainer) this.resultsContainer.style.display = 'none';
+        if (this.emptyState) this.emptyState.style.display = 'none';
         this.showLoading(false);
         
         this.updateSearchStatus('Escriba para buscar en tiempo real...', 'idle');
@@ -383,16 +396,11 @@ class AlumnosApp {
     }
 }
 
-// Inicializar aplicacion cuando el DOM este listo
+// Variable global para acceso al logout
+let alumnosApp;
+
+// Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', () => {
-    new AlumnosApp();
-});
-
-// Registrar eventos globales
-window.addEventListener('online', () => {
-    console.log('Conexion restaurada');
-});
-
-window.addEventListener('offline', () => {
-    console.log('Conexion perdida');
+    console.log('DOM cargado, inicializando app...');
+    alumnosApp = new AlumnosApp();
 });
